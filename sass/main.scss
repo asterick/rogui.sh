@@ -1,0 +1,35 @@
+@import "pure/pure";
+
+@import "compass/css3/background-size";
+@import "compass/css3/images";
+
+$emoji-spacing: 1px;
+$emoji-layout: 'smart';
+$emoji-sprite-dimensions: true;
+
+@import "emoji/*.png";
+@include all-emoji-sprites;
+
+@mixin resize-sprite($map, $sprite, $percent) {
+  $spritePath:    sprite-path($map);
+  $spriteWidth:   image-width($spritePath);
+  $spriteHeight:  image-height($spritePath);
+  $width: image-width(sprite-file($map, $sprite));
+  $height: image-height(sprite-file($map, $sprite));
+
+  @include background-size(ceil($spriteWidth * ($percent/100)) ceil($spriteHeight * ($percent/100)));
+  width: ceil($width*($percent/100));
+  height: ceil($height*($percent/100));
+  background-position: 0 floor(nth(sprite-position($map, $sprite), 2)  * ($percent/100) );
+}
+
+.bowtie {
+	display: inline-block;
+
+	@include emoji-sprite(bowtie);
+	@include resize-sprite($emoji-sprites, bowtie, 50);
+}
+
+body {
+	//@include background(image-url('emoji/twitter-1f004.png'));
+}
