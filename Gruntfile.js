@@ -21,7 +21,7 @@ module.exports = function(grunt) {
 					output: "Express server listening on port .+",
 					debug: true
 				}
-	  		}
+			}
 		},
 
 		compass: {
@@ -49,11 +49,11 @@ module.exports = function(grunt) {
 					watch: true,
 					debug: true,
 					transform: [
-						["reactify", {"es6": true}]
+						"reactify"
 					]
 				},
 				files: {
-					'public/assets/roguish.js': 'app/client.js'
+					'public/assets/roguish.js': 'app/application.jsx'
 				}
 			}
 		},
@@ -61,7 +61,7 @@ module.exports = function(grunt) {
 		uglify: {
 			dist: {
 				files: {
-					'public/assets/roguish.min.js': 'public/assets/roguish.js'
+					'public/assets/roguish.js': 'public/assets/roguish.js'
 				}
 			}
 		},
@@ -89,7 +89,7 @@ module.exports = function(grunt) {
 	grunt.loadNpmTasks('grunt-contrib-compass');
 
 	grunt.registerTask('dev', ['browserify', "watch"]);
-	grunt.registerTask('prod', ['sass', 'browserify:prod', 'uglify', "express:prod"]);
+	grunt.registerTask('prod', ['compass', 'browserify:prod', 'uglify', "express:prod"]);
 
 	grunt.registerTask('default', ['dev']);
 
