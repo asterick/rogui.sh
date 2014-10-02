@@ -5,7 +5,8 @@ var url = require("url"),
 
 var app = module.exports = express(),
 	static_path = path.join(__dirname, "/../public"),
-	Application = require('./application.jsx');
+	Application = require('./application.jsx'),
+	Flux = require('./flux');
 
 // Configure our application
 app.set('port', process.env.PORT || 3000);
@@ -17,10 +18,16 @@ app.engine('html', require('ejs').renderFile);
 app.use(express.static(static_path));
 
 app.use(function(req, res, next){
+	var flux = Flux();
+
 	ReactAsync.renderComponentToStringWithAsyncState(
-		Application({ path: req.path }),
+		Application({
+			dispatcher: flux,
+			path: req.path
+		}),
 		function(err, markup) {
 			res.render("layout.html", {
+				stores: flux.serialize(),
 				content: markup,
 				title: "game engine"
 			});

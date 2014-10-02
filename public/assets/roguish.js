@@ -1,7 +1,8 @@
 (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({"/Users/asterick/Desktop/rogui.sh/app/application.jsx":[function(require,module,exports){
 /** @jsx React.DOM */
 var React = require('react'),
-	Router = require('react-router-component');
+	Router = require('react-router-component'),
+	Flux = require('./flux');
 
 var Page404 = require("./controls/404.jsx"),
 	Page = require("./controls/page.jsx"),
@@ -10,6 +11,13 @@ var Page404 = require("./controls/404.jsx"),
 	NotFound = Router.NotFound;
 
 var Application = React.createClass({displayName: 'Application',
+	getDefaultProps: function () {
+		return {
+			'path': '/',
+			'dispatcher': new Flux()
+		};
+	},
+
 	render: function() {
 		return (
 			React.DOM.div(null, 
@@ -22,15 +30,24 @@ var Application = React.createClass({displayName: 'Application',
 	}
 });
 
-module.exports = Application;
-
 if (typeof window !== 'undefined') {
 	window.onload = function() {
-		React.renderComponent(Application(), document.body);
+		var stores;
+
+		if (document.body.dataset.fluxstores) try {
+			stores = JSON.parse(document.body.dataset.fluxstores);
+			delete document.body.dataset.fluxstores;
+		} catch (e) { null ; }
+
+		React.renderComponent(Application({
+			dispatcher: new Flux(stores)
+		}), document.body);
 	}
 }
 
-},{"./controls/404.jsx":"/Users/asterick/Desktop/rogui.sh/app/controls/404.jsx","./controls/page.jsx":"/Users/asterick/Desktop/rogui.sh/app/controls/page.jsx","react":"/Users/asterick/Desktop/rogui.sh/node_modules/react/react.js","react-router-component":"/Users/asterick/Desktop/rogui.sh/node_modules/react-router-component/index.js"}],"/Users/asterick/Desktop/rogui.sh/app/controls/404.jsx":[function(require,module,exports){
+module.exports = Application;
+
+},{"./controls/404.jsx":"/Users/asterick/Desktop/rogui.sh/app/controls/404.jsx","./controls/page.jsx":"/Users/asterick/Desktop/rogui.sh/app/controls/page.jsx","./flux":"/Users/asterick/Desktop/rogui.sh/app/flux/index.js","react":"/Users/asterick/Desktop/rogui.sh/node_modules/react/react.js","react-router-component":"/Users/asterick/Desktop/rogui.sh/node_modules/react-router-component/index.js"}],"/Users/asterick/Desktop/rogui.sh/app/controls/404.jsx":[function(require,module,exports){
 /** @jsx React.DOM */
 var React = require('react');
 
@@ -68,7 +85,193 @@ module.exports = React.createClass({displayName: 'exports',
 	}
 });
 
-},{"react":"/Users/asterick/Desktop/rogui.sh/node_modules/react/react.js","react-async":"/Users/asterick/Desktop/rogui.sh/node_modules/react-async/browser.js"}],"/Users/asterick/Desktop/rogui.sh/node_modules/browserify/node_modules/process/browser.js":[function(require,module,exports){
+},{"react":"/Users/asterick/Desktop/rogui.sh/node_modules/react/react.js","react-async":"/Users/asterick/Desktop/rogui.sh/node_modules/react-async/browser.js"}],"/Users/asterick/Desktop/rogui.sh/app/flux/dispatcher.js":[function(require,module,exports){
+var Store = require("./store.js");
+
+function Dispatcher(init) {
+	this._actions = {};
+	this._storeInstances = [];
+
+	this._initalizer = init || {};
+}
+
+Dispatcher.prototype.action = function (name) {
+	var data = Array.prototype.slice.call(arguments, 1),
+		targets = this._actions[name];
+
+	if (!targets) { return ; }
+
+	targets.forEach(function (cb) {
+		cb.apply(null, data);
+	}, this);
+}
+
+Dispatcher.prototype.serialize = function () {
+	var bundle = {};
+
+	return JSON.stringify(
+		this._storeInstance.reduce(function (acc, store) {
+			if (store.options._name) {
+				bundle = store._dataset;
+			}
+
+			return acc;
+		}, {}));
+}
+
+Dispatcher.prototype.getStore = function (store) {
+	return this._storeInstances.reduce(function (acc, target) {
+		return (Object.getPrototypeOf(target) === store) ? target : acc;
+	}, null);
+}
+
+Dispatcher.prototype.addStores = function () {
+	var stores = Array.prototype.slice.call(arguments, 0);
+
+	stores.forEach(function (store) {
+		var init = this._initalizer[store._options.name]
+			binders = store._options.actions,
+			inst = store._getInstance(init);
+
+		this._storeInstances.push(inst);
+
+		Object.keys(binders).forEach(function (action) {
+			var set = this._actions[action] || (this._actions[action] = []),
+				call = binders[action].bind(inst);
+
+			set.push(call);
+		}, this);
+	}, this);
+};
+
+Dispatcher.prototype.respondsTo = function (name) {
+	var keys = Object.keys(this._actions);
+
+	if (name) { return keys.indexOf(name) >= 0; }
+
+	return keys;
+}
+
+module.exports = Dispatcher;
+
+},{"./store.js":"/Users/asterick/Desktop/rogui.sh/app/flux/store.js"}],"/Users/asterick/Desktop/rogui.sh/app/flux/index.js":[function(require,module,exports){
+var Dispatcher = require("./dispatcher.js"),
+	Store = require("./store.js");
+
+/***
+ *** TODO: CREATE STORES
+ ***/
+
+module.exports = function (init) {
+	var dispatcher = new Dispatcher(init);
+
+	dispatcher.addStores();
+
+	return dispatcher;
+};
+
+},{"./dispatcher.js":"/Users/asterick/Desktop/rogui.sh/app/flux/dispatcher.js","./store.js":"/Users/asterick/Desktop/rogui.sh/app/flux/store.js"}],"/Users/asterick/Desktop/rogui.sh/app/flux/store.js":[function(require,module,exports){
+var ReactAsync = require('react-async');
+
+function Store(options) {
+	this._options = options || {};
+}
+
+Store.prototype._getInstance = function (init) {
+	var that = Object.create(this, {
+		_listeners: { value: [] }
+	});
+
+	// Skip the initalization step and simply provide an empty store
+	if (init) {
+		that._dataset = inti;
+	} else if (!that._options.initalize) {
+		that._dataset = null;
+	}
+
+	return that;
+};
+
+Store.prototype.changed = function (action) {
+	this._listeners.forEach(function (target) {
+		var listener = target.listener;
+
+		if (listener.storeDidChange) {
+			listener.storeDidChange(target.name, action, this._dataset, this);
+		}
+		listener.forceUpdate();
+	});
+};
+
+Store.prototype.subscribe = function (name, listener) {
+	this.unsubscribe(listener);
+
+	this._listeners.push({
+		name: name,
+		listener: listener
+	});
+};
+
+Store.prototype.unsubscribe = function (listener) {
+	this._listeners = this._listeners.filter(function (old) {
+		return old.listener !== listener;
+	});
+};
+
+Store.prototype.requestInitalization = function (done) {
+	this._options.initalize.call(this, done);
+};
+
+Store.prototype.hasInitalized = function () {
+	return store._dataset !== undefined;
+};
+
+Store.prototype.mixin = function (name) {
+	var store = this,
+		mixin = {
+			componentWillMount: function () {
+				this.stores || (this.stores = {});
+				this.stores[name] = store._dataset;
+				store.subscribe(name, this);
+			},
+
+			componentWillMount: function () {
+				store.unsubscribe(this);
+			}
+		};
+
+	if (this._options.async) {
+		mixin.mixins = [ReactAsync.Mixin];
+		mixin.getInitialStateAsync = function(cb) {
+			var that = this;
+
+			function initState() {
+				if (that.getAsyncInitalStateAsync) {
+					that.getAsyncInitalStateAsync(cb);
+				} else {
+					cb (null, {});
+				}
+			}
+
+			if (store.hasInitalized()) {
+				initState();
+			} else {
+				store.requestInitalization(initState());
+			}
+		};
+	} else {
+		// TODO: ACTUALLY FIX THIS
+		mixin.getInitialState = function () {
+			if (!store.hasInitalized()) {
+				store.requestInitalization();
+			}
+		};
+	}
+};
+
+module.exports = Store;
+
+},{"react-async":"/Users/asterick/Desktop/rogui.sh/node_modules/react-async/browser.js"}],"/Users/asterick/Desktop/rogui.sh/node_modules/browserify/node_modules/process/browser.js":[function(require,module,exports){
 // shim for using process in browser
 
 var process = module.exports = {};
