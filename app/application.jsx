@@ -10,20 +10,18 @@ var Page404 = require("./controls/404.jsx"),
 	NotFound = Router.NotFound;
 
 var Application = React.createClass({
-	getDefaultProps: function () {
-		return {
-			'path': '/',
-			'dispatcher': new Flux()
-		};
+	click: function () {
+		this.props.dispatcher.trigger("ACTION", 1, 2, 3);
 	},
 
 	render: function() {
 		return (
 			<div>
 				<Locations path={this.props.path}>
-					<Location path="/message" handler={Page} />
+					<Location path="/" handler={Page} dispatcher={this.props.dispatcher} />
 					<NotFound handler={Page404} />
 				</Locations>
+				<button onClick={this.click}>Click</button>
 			</div>
 		)
 	}
@@ -39,7 +37,7 @@ if (typeof window !== 'undefined') {
 		} catch (e) { null ; }
 
 		React.renderComponent(Application({
-			dispatcher: new Flux(stores)
+			dispatcher: new Flux.Dispatcher(stores)
 		}), document.body);
 	}
 }

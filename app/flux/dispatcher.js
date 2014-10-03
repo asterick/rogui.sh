@@ -7,27 +7,25 @@ function Dispatcher(init) {
 	this._initalizer = init || {};
 }
 
-Dispatcher.prototype.action = function (name) {
+Dispatcher.prototype.trigger = function (name) {
 	var data = Array.prototype.slice.call(arguments, 1),
 		targets = this._actions[name];
 
 	if (!targets) { return ; }
 
-	targets.forEach(function (cb) {
-		cb.apply(null, data);
+	targets.forEach(function (call) {
+		call.action.apply(call.context, data);
 	}, this);
 }
 
 Dispatcher.prototype.serialize = function () {
-	var bundle = {};
-
 	return JSON.stringify(
-		this._storeInstance.reduce(function (acc, store) {
-			if (store.options._name) {
-				bundle = store._dataset;
-			}
+		this._storeInstances.reduce(function (bundle, store) {
+			var options = Object.getPrototypeOf(store)._options;
 
-			return acc;
+			if (options.name) { bundle[options.name] = store._dataset; }
+
+			return bundle;
 		}, {}));
 }
 
@@ -49,9 +47,9 @@ Dispatcher.prototype.addStores = function () {
 
 		Object.keys(binders).forEach(function (action) {
 			var set = this._actions[action] || (this._actions[action] = []),
-				call = binders[action].bind(inst);
+				call = binders[action];
 
-			set.push(call);
+			set.push({ context: inst, action: call });
 		}, this);
 	}, this);
 };

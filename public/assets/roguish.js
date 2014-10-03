@@ -11,20 +11,18 @@ var Page404 = require("./controls/404.jsx"),
 	NotFound = Router.NotFound;
 
 var Application = React.createClass({displayName: 'Application',
-	getDefaultProps: function () {
-		return {
-			'path': '/',
-			'dispatcher': new Flux()
-		};
+	click: function () {
+		this.props.dispatcher.trigger("ACTION", 1, 2, 3);
 	},
 
 	render: function() {
 		return (
 			React.DOM.div(null, 
 				Locations({path: this.props.path}, 
-					Location({path: "/message", handler: Page}), 
+					Location({path: "/", handler: Page, dispatcher: this.props.dispatcher}), 
 					NotFound({handler: Page404})
-				)
+				), 
+				React.DOM.button({onClick: this.click}, "Click")
 			)
 		)
 	}
@@ -40,7 +38,7 @@ if (typeof window !== 'undefined') {
 		} catch (e) { null ; }
 
 		React.renderComponent(Application({
-			dispatcher: new Flux(stores)
+			dispatcher: new Flux.Dispatcher(stores)
 		}), document.body);
 	}
 }
@@ -60,32 +58,31 @@ module.exports = React.createClass({displayName: 'exports',
 },{"react":"/Users/asterick/Desktop/rogui.sh/node_modules/react/react.js"}],"/Users/asterick/Desktop/rogui.sh/app/controls/page.jsx":[function(require,module,exports){
 /** @jsx React.DOM */
 var React = require('react'),
-	Async = require('react-async');
+	Flux = require("../flux");
 
 module.exports = React.createClass({displayName: 'exports',
-	mixins: [Async.Mixin],
+	mixins: [Flux.MessageStore.mixin()],
 
-	getInitialStateAsync: function (cb) {
-		setTimeout(function () {cb(null, { message: "hello" }); }, 1000);
+	findFluxDispatcher: function () {
+		return this.props.dispatcher;
 	},
 
-	componentDidMount: function () {
-		var node = this.getDOMNode(),
-			state = node.dataset.state || "{}";
-
-		this.replaceState(JSON.parse(node.dataset.state))
+	getAsyncInitalStateAsync: function (cb) {
+		cb(null, {});
 	},
 
 	render: function() {
+		if (!this.stores.messages) { return React.DOM.div(null); }
+
 		return (
 			React.DOM.div({'data-state': JSON.stringify(this.state)}, 
-				this.state.message
+				this.stores.messages.message
 			)
 		);
 	}
 });
 
-},{"react":"/Users/asterick/Desktop/rogui.sh/node_modules/react/react.js","react-async":"/Users/asterick/Desktop/rogui.sh/node_modules/react-async/browser.js"}],"/Users/asterick/Desktop/rogui.sh/app/flux/dispatcher.js":[function(require,module,exports){
+},{"../flux":"/Users/asterick/Desktop/rogui.sh/app/flux/index.js","react":"/Users/asterick/Desktop/rogui.sh/node_modules/react/react.js"}],"/Users/asterick/Desktop/rogui.sh/app/flux/dispatcher.js":[function(require,module,exports){
 var Store = require("./store.js");
 
 function Dispatcher(init) {
@@ -95,27 +92,25 @@ function Dispatcher(init) {
 	this._initalizer = init || {};
 }
 
-Dispatcher.prototype.action = function (name) {
+Dispatcher.prototype.trigger = function (name) {
 	var data = Array.prototype.slice.call(arguments, 1),
 		targets = this._actions[name];
 
 	if (!targets) { return ; }
 
-	targets.forEach(function (cb) {
-		cb.apply(null, data);
+	targets.forEach(function (call) {
+		call.action.apply(call.context, data);
 	}, this);
 }
 
 Dispatcher.prototype.serialize = function () {
-	var bundle = {};
-
 	return JSON.stringify(
-		this._storeInstance.reduce(function (acc, store) {
-			if (store.options._name) {
-				bundle = store._dataset;
-			}
+		this._storeInstances.reduce(function (bundle, store) {
+			var options = Object.getPrototypeOf(store)._options;
 
-			return acc;
+			if (options.name) { bundle[options.name] = store._dataset; }
+
+			return bundle;
 		}, {}));
 }
 
@@ -137,9 +132,9 @@ Dispatcher.prototype.addStores = function () {
 
 		Object.keys(binders).forEach(function (action) {
 			var set = this._actions[action] || (this._actions[action] = []),
-				call = binders[action].bind(inst);
+				call = binders[action];
 
-			set.push(call);
+			set.push({ context: inst, action: call });
 		}, this);
 	}, this);
 };
@@ -158,16 +153,34 @@ module.exports = Dispatcher;
 var Dispatcher = require("./dispatcher.js"),
 	Store = require("./store.js");
 
-/***
- *** TODO: CREATE STORES
- ***/
+var MessageStore = new Store({
+		name: "messages",
+		async: true,
 
-module.exports = function (init) {
-	var dispatcher = new Dispatcher(init);
+		initalize: function (done) {
+			done({
+				message: "Hello World"
+			});
+		},
 
-	dispatcher.addStores();
+		actions: {
+			"ACTION": function (a,b,c) {
+				this._dataset.message = Math.random().toString();
+				this.changed();
+			}
+		}
+	});
 
-	return dispatcher;
+module.exports = {
+	MessageStore: MessageStore,
+
+	Dispatcher: function (init) {
+		var dispatcher = new Dispatcher(init);
+
+		dispatcher.addStores(MessageStore);
+
+		return dispatcher;
+	}
 };
 
 },{"./dispatcher.js":"/Users/asterick/Desktop/rogui.sh/app/flux/dispatcher.js","./store.js":"/Users/asterick/Desktop/rogui.sh/app/flux/store.js"}],"/Users/asterick/Desktop/rogui.sh/app/flux/store.js":[function(require,module,exports){
@@ -184,9 +197,9 @@ Store.prototype._getInstance = function (init) {
 
 	// Skip the initalization step and simply provide an empty store
 	if (init) {
-		that._dataset = inti;
+		that._dataset = init;
 	} else if (!that._options.initalize) {
-		that._dataset = null;
+		that._dataset = {};
 	}
 
 	return that;
@@ -219,23 +232,39 @@ Store.prototype.unsubscribe = function (listener) {
 };
 
 Store.prototype.requestInitalization = function (done) {
-	this._options.initalize.call(this, done);
+	var that = this;
+
+	this._options.initalize.call(this._dataset, function (value) {
+		that._dataset = value;
+		done();
+	});
 };
 
 Store.prototype.hasInitalized = function () {
-	return store._dataset !== undefined;
+	return this._dataset !== undefined;
 };
 
 Store.prototype.mixin = function (name) {
-	var store = this,
+	name || (name = this._options.name);
+	var storeType = this,
 		mixin = {
 			componentWillMount: function () {
-				this.stores || (this.stores = {});
-				this.stores[name] = store._dataset;
+				var dispatcher = this.findFluxDispatcher(),
+					store = dispatcher.getStore(storeType);
+
+				if (this.stores === undefined) { this.stores = {}; }
+
+				Object.defineProperty(this.stores, name, {
+					get: function () { return store._dataset; }
+				});
+
 				store.subscribe(name, this);
 			},
 
-			componentWillMount: function () {
+			componentWillUnmount: function () {
+				var dispatcher = this.findFluxDispatcher(),
+					store = dispatcher.getStore(storeType);
+
 				store.unsubscribe(this);
 			}
 		};
@@ -243,7 +272,9 @@ Store.prototype.mixin = function (name) {
 	if (this._options.async) {
 		mixin.mixins = [ReactAsync.Mixin];
 		mixin.getInitialStateAsync = function(cb) {
-			var that = this;
+			var dispatcher = this.findFluxDispatcher(),
+				store = dispatcher.getStore(storeType),
+				that = this;
 
 			function initState() {
 				if (that.getAsyncInitalStateAsync) {
@@ -256,17 +287,21 @@ Store.prototype.mixin = function (name) {
 			if (store.hasInitalized()) {
 				initState();
 			} else {
-				store.requestInitalization(initState());
+				store.requestInitalization(initState);
 			}
 		};
 	} else {
 		// TODO: ACTUALLY FIX THIS
 		mixin.getInitialState = function () {
+			var dispatcher = this.findFluxDispatcher(),
+				store = dispatcher.getStore(storeType);
+
 			if (!store.hasInitalized()) {
 				store.requestInitalization();
 			}
 		};
 	}
+	return mixin;
 };
 
 module.exports = Store;

@@ -18,7 +18,7 @@ app.engine('html', require('ejs').renderFile);
 app.use(express.static(static_path));
 
 app.use(function(req, res, next){
-	var flux = Flux();
+	var flux = Flux.Dispatcher();
 
 	ReactAsync.renderComponentToStringWithAsyncState(
 		Application({

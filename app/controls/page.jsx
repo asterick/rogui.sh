@@ -1,25 +1,24 @@
 /** @jsx React.DOM */
 var React = require('react'),
-	Async = require('react-async');
+	Flux = require("../flux");
 
 module.exports = React.createClass({
-	mixins: [Async.Mixin],
+	mixins: [Flux.MessageStore.mixin()],
 
-	getInitialStateAsync: function (cb) {
-		setTimeout(function () {cb(null, { message: "hello" }); }, 1000);
+	findFluxDispatcher: function () {
+		return this.props.dispatcher;
 	},
 
-	componentDidMount: function () {
-		var node = this.getDOMNode(),
-			state = node.dataset.state || "{}";
-
-		this.replaceState(JSON.parse(node.dataset.state))
+	getAsyncInitalStateAsync: function (cb) {
+		cb(null, {});
 	},
 
 	render: function() {
+		if (!this.stores.messages) { return <div/>; }
+
 		return (
 			<div data-state={JSON.stringify(this.state)}>
-				{this.state.message}
+				{this.stores.messages.message}
 			</div>
 		);
 	}

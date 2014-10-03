@@ -1,14 +1,32 @@
 var Dispatcher = require("./dispatcher.js"),
 	Store = require("./store.js");
 
-/***
- *** TODO: CREATE STORES
- ***/
+var MessageStore = new Store({
+		name: "messages",
+		async: true,
 
-module.exports = function (init) {
-	var dispatcher = new Dispatcher(init);
+		initalize: function (done) {
+			done({
+				message: "Hello World"
+			});
+		},
 
-	dispatcher.addStores();
+		actions: {
+			"ACTION": function (a,b,c) {
+				this._dataset.message = Math.random().toString();
+				this.changed();
+			}
+		}
+	});
 
-	return dispatcher;
+module.exports = {
+	MessageStore: MessageStore,
+
+	Dispatcher: function (init) {
+		var dispatcher = new Dispatcher(init);
+
+		dispatcher.addStores(MessageStore);
+
+		return dispatcher;
+	}
 };

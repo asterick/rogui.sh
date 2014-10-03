@@ -11,9 +11,9 @@ Store.prototype._getInstance = function (init) {
 
 	// Skip the initalization step and simply provide an empty store
 	if (init) {
-		that._dataset = inti;
+		that._dataset = init;
 	} else if (!that._options.initalize) {
-		that._dataset = null;
+		that._dataset = {};
 	}
 
 	return that;
@@ -46,23 +46,39 @@ Store.prototype.unsubscribe = function (listener) {
 };
 
 Store.prototype.requestInitalization = function (done) {
-	this._options.initalize.call(this, done);
+	var that = this;
+
+	this._options.initalize.call(this._dataset, function (value) {
+		that._dataset = value;
+		done();
+	});
 };
 
 Store.prototype.hasInitalized = function () {
-	return store._dataset !== undefined;
+	return this._dataset !== undefined;
 };
 
 Store.prototype.mixin = function (name) {
-	var store = this,
+	name || (name = this._options.name);
+	var storeType = this,
 		mixin = {
 			componentWillMount: function () {
-				this.stores || (this.stores = {});
-				this.stores[name] = store._dataset;
+				var dispatcher = this.findFluxDispatcher(),
+					store = dispatcher.getStore(storeType);
+
+				if (this.stores === undefined) { this.stores = {}; }
+
+				Object.defineProperty(this.stores, name, {
+					get: function () { return store._dataset; }
+				});
+
 				store.subscribe(name, this);
 			},
 
-			componentWillMount: function () {
+			componentWillUnmount: function () {
+				var dispatcher = this.findFluxDispatcher(),
+					store = dispatcher.getStore(storeType);
+
 				store.unsubscribe(this);
 			}
 		};
@@ -70,7 +86,9 @@ Store.prototype.mixin = function (name) {
 	if (this._options.async) {
 		mixin.mixins = [ReactAsync.Mixin];
 		mixin.getInitialStateAsync = function(cb) {
-			var that = this;
+			var dispatcher = this.findFluxDispatcher(),
+				store = dispatcher.getStore(storeType),
+				that = this;
 
 			function initState() {
 				if (that.getAsyncInitalStateAsync) {
@@ -83,17 +101,21 @@ Store.prototype.mixin = function (name) {
 			if (store.hasInitalized()) {
 				initState();
 			} else {
-				store.requestInitalization(initState());
+				store.requestInitalization(initState);
 			}
 		};
 	} else {
 		// TODO: ACTUALLY FIX THIS
 		mixin.getInitialState = function () {
+			var dispatcher = this.findFluxDispatcher(),
+				store = dispatcher.getStore(storeType);
+
 			if (!store.hasInitalized()) {
 				store.requestInitalization();
 			}
 		};
 	}
+	return mixin;
 };
 
 module.exports = Store;
