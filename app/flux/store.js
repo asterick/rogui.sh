@@ -48,7 +48,7 @@ Store.prototype.unsubscribe = function (listener) {
 Store.prototype.requestInitalization = function (done) {
 	var that = this;
 
-	this._options.initalize.call(this._dataset, function (value) {
+	return this._options.initalize.call(this._dataset, function (value) {
 		that._dataset = value;
 		done();
 	});
@@ -81,18 +81,19 @@ Store.prototype.mixin = function (name) {
 
 				store.unsubscribe(this);
 			}
-		};
+		}
 
 	if (this._options.async) {
-		mixin.mixins = [ReactAsync.Mixin];
+		mixin.mixins = [ReactAsync.Mixin]
+
 		mixin.getInitialStateAsync = function(cb) {
 			var dispatcher = this.findFluxDispatcher(),
 				store = dispatcher.getStore(storeType),
 				that = this;
 
 			function initState() {
-				if (that.getAsyncInitalStateAsync) {
-					that.getAsyncInitalStateAsync(cb);
+				if (that.getAsyncInitialState) {
+					that.getAsyncInitialState(cb);
 				} else {
 					cb (null, {});
 				}
@@ -105,16 +106,19 @@ Store.prototype.mixin = function (name) {
 			}
 		};
 	} else {
-		// TODO: ACTUALLY FIX THIS
 		mixin.getInitialState = function () {
 			var dispatcher = this.findFluxDispatcher(),
-				store = dispatcher.getStore(storeType);
+				store = dispatcher.getStore(storeType),
+				that = this;
 
 			if (!store.hasInitalized()) {
-				store.requestInitalization();
+				store._dataset = store.requestInitalization();
 			}
+
+			return {};
 		};
 	}
+
 	return mixin;
 };
 

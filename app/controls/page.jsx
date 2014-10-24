@@ -9,8 +9,10 @@ module.exports = React.createClass({
 		return this.props.dispatcher;
 	},
 
-	getAsyncInitalStateAsync: function (cb) {
-		cb(null, {});
+	getAsyncInitialState: function (cb) {
+		cb(null, {
+			crap: 1
+		});
 	},
 
 	render: function() {
@@ -18,6 +20,7 @@ module.exports = React.createClass({
 
 		return (
 			<div data-state={JSON.stringify(this.state)}>
+				{this.state.crap}
 				{this.stores.messages.message}
 			</div>
 		);

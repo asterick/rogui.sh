@@ -1,4 +1,9 @@
-(function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({"/Users/asterick/Desktop/rogui.sh/app/application.jsx":[function(require,module,exports){
+(function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({"/Users/asterick/Desktop/rogui.sh/app/api/index.js":[function(require,module,exports){
+module.exports = {
+
+}
+
+},{}],"/Users/asterick/Desktop/rogui.sh/app/application.jsx":[function(require,module,exports){
 /** @jsx React.DOM */
 var React = require('react'),
 	Router = require('react-router-component'),
@@ -67,8 +72,10 @@ module.exports = React.createClass({displayName: 'exports',
 		return this.props.dispatcher;
 	},
 
-	getAsyncInitalStateAsync: function (cb) {
-		cb(null, {});
+	getAsyncInitialState: function (cb) {
+		cb(null, {
+			crap: 1
+		});
 	},
 
 	render: function() {
@@ -76,6 +83,7 @@ module.exports = React.createClass({displayName: 'exports',
 
 		return (
 			React.DOM.div({'data-state': JSON.stringify(this.state)}, 
+				this.state.crap, 
 				this.stores.messages.message
 			)
 		);
@@ -99,7 +107,8 @@ Dispatcher.prototype.trigger = function (name) {
 	if (!targets) { return ; }
 
 	targets.forEach(function (call) {
-		call.action.apply(call.context, data);
+		var changed = call.action.apply(call.context._dataset, data);
+		if (changed) { call.context.changed(); }
 	}, this);
 }
 
@@ -151,22 +160,31 @@ module.exports = Dispatcher;
 
 },{"./store.js":"/Users/asterick/Desktop/rogui.sh/app/flux/store.js"}],"/Users/asterick/Desktop/rogui.sh/app/flux/index.js":[function(require,module,exports){
 var Dispatcher = require("./dispatcher.js"),
-	Store = require("./store.js");
+	Store = require("./store.js"),
+	API = require("../api");
 
 var MessageStore = new Store({
 		name: "messages",
 		async: true,
 
 		initalize: function (done) {
-			done({
-				message: "Hello World"
-			});
+			var xhr = new XMLHttpRequest();
+
+			xhr.open("GET", "/ajax/data", true);
+			xhr.send();
+
+			xhr.onreadystatechange = function () {
+				if (xhr.readyState !== 4) { return ; }
+				if (xhr.status !== 200) { done( { error: "..." } ); }
+
+				done(JSON.parse(xhr.response));
+			}
 		},
 
 		actions: {
 			"ACTION": function (a,b,c) {
-				this._dataset.message = Math.random().toString();
-				this.changed();
+				this.message = Math.random().toString();
+				return true;
 			}
 		}
 	});
@@ -183,7 +201,7 @@ module.exports = {
 	}
 };
 
-},{"./dispatcher.js":"/Users/asterick/Desktop/rogui.sh/app/flux/dispatcher.js","./store.js":"/Users/asterick/Desktop/rogui.sh/app/flux/store.js"}],"/Users/asterick/Desktop/rogui.sh/app/flux/store.js":[function(require,module,exports){
+},{"../api":"/Users/asterick/Desktop/rogui.sh/app/api/index.js","./dispatcher.js":"/Users/asterick/Desktop/rogui.sh/app/flux/dispatcher.js","./store.js":"/Users/asterick/Desktop/rogui.sh/app/flux/store.js"}],"/Users/asterick/Desktop/rogui.sh/app/flux/store.js":[function(require,module,exports){
 var ReactAsync = require('react-async');
 
 function Store(options) {
@@ -234,7 +252,7 @@ Store.prototype.unsubscribe = function (listener) {
 Store.prototype.requestInitalization = function (done) {
 	var that = this;
 
-	this._options.initalize.call(this._dataset, function (value) {
+	return this._options.initalize.call(this._dataset, function (value) {
 		that._dataset = value;
 		done();
 	});
@@ -267,18 +285,19 @@ Store.prototype.mixin = function (name) {
 
 				store.unsubscribe(this);
 			}
-		};
+		}
 
 	if (this._options.async) {
-		mixin.mixins = [ReactAsync.Mixin];
+		mixin.mixins = [ReactAsync.Mixin]
+
 		mixin.getInitialStateAsync = function(cb) {
 			var dispatcher = this.findFluxDispatcher(),
 				store = dispatcher.getStore(storeType),
 				that = this;
 
 			function initState() {
-				if (that.getAsyncInitalStateAsync) {
-					that.getAsyncInitalStateAsync(cb);
+				if (that.getAsyncInitialState) {
+					that.getAsyncInitialState(cb);
 				} else {
 					cb (null, {});
 				}
@@ -291,16 +310,19 @@ Store.prototype.mixin = function (name) {
 			}
 		};
 	} else {
-		// TODO: ACTUALLY FIX THIS
 		mixin.getInitialState = function () {
 			var dispatcher = this.findFluxDispatcher(),
-				store = dispatcher.getStore(storeType);
+				store = dispatcher.getStore(storeType),
+				that = this;
 
 			if (!store.hasInitalized()) {
-				store.requestInitalization();
+				store._dataset = store.requestInitalization();
 			}
+
+			return {};
 		};
 	}
+
 	return mixin;
 };
 

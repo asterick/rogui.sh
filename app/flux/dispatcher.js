@@ -14,7 +14,8 @@ Dispatcher.prototype.trigger = function (name) {
 	if (!targets) { return ; }
 
 	targets.forEach(function (call) {
-		call.action.apply(call.context, data);
+		var changed = call.action.apply(call.context._dataset, data);
+		if (changed) { call.context.changed(); }
 	}, this);
 }
 

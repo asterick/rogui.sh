@@ -17,6 +17,10 @@ app.engine('html', require('ejs').renderFile);
 // Middleware layer
 app.use(express.static(static_path));
 
+app.get("/ajax/data", function (req, res) {
+	res.send('{ "message": "hello junkie" }');
+})
+
 app.use(function(req, res, next){
 	var flux = Flux.Dispatcher();
 
